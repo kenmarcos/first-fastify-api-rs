@@ -1,15 +1,18 @@
-import fastify from "fastify";
+import fastify from 'fastify'
+import { knex } from './database'
 
-const app = fastify();
+const app = fastify()
 
-app.get("/", () => {
-  return "Hello World";
-});
+app.get('/', async () => {
+  const tables = await knex('sqlite_schema').select('*')
+
+  return tables
+})
 
 app
   .listen({
     port: 3333,
   })
   .then(() => {
-    console.log("HTTP server running on http://localhost:3333");
-  });
+    console.log('HTTP server running on http://localhost:3333')
+  })
