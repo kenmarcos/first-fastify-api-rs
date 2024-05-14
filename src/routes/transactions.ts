@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify'
 import { knex } from '../database'
 import { z } from 'zod'
 import { randomUUID } from 'node:crypto'
+import { checkSessionIdExists } from '../middlewares/check-session-id-exists'
 
 export const transactionsRoutes = async (app: FastifyInstance) => {
   app.post('/', async (request, reply) => {
@@ -15,8 +16,7 @@ export const transactionsRoutes = async (app: FastifyInstance) => {
       request.body,
     )
 
-    let sessionId = reply.cookies?.sessionId
-    console.log('🚀 ~ app.post ~ sessionId:', sessionId)
+    let sessionId = request.cookies.sessionId
 
     if (!sessionId) {
       sessionId = randomUUID()
@@ -36,4 +36,68 @@ export const transactionsRoutes = async (app: FastifyInstance) => {
 
     return reply.status(201).send()
   })
+
+  app.get(
+    '/',
+    {
+      preHandler: [checkSessionIdExists],
+    },
+    async (request) => {
+      const { sessionId } = request.cookies
+
+      const transactions = await knex('transactions')
+        .where('session_id', sessionId)
+        .select()
+
+      return {
+        transactions,
+      }
+    },
+  )
+
+  app.get(
+    '/:id',
+    {
+      preHandler: [checkSessionIdExists],
+    },
+    async (request) => {
+      const getTransactionParamsSchema = z.object({
+        id: z.string().uuid(),
+      })
+
+      const { id } = getTransactionParamsSchema.parse(request.params)
+
+      const { sessionId } = request.cookies
+
+      const transaction = await knex('transactions')
+        .where({
+          id,
+          session_id: sessionId,
+        })
+        .first()
+
+      return {
+        transaction,
+      }
+    },
+  )
+
+  app.get(
+    '/summary',
+    {
+      preHandler: [checkSessionIdExists],
+    },
+    async (request) => {
+      const { sessionId } = request.cookies
+
+      const summary = await knex('transactions')
+        .where('session_id', sessionId)
+        .sum('amount', { as: 'amount' })
+        .first()
+
+      return {
+        summary,
+      }
+    },
+  )
 }
